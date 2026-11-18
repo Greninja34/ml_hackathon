@@ -61,6 +61,7 @@ Weakest evaluator trips: 00000030 (top-1 83.8%), 00000015 (route F1 81.7%); on 0
 | `results/` | every table, figure, Folium map, trial record and run log produced by the scripts |
 | `api/` | FastAPI backend (Laptop 1) |
 | `ui/` | Streamlit evaluator UI (Laptop 2) + its own `requirements.txt` |
+| `report/` | Technical report: `PathSnap_Technical_Report.pdf`, its source `report.html` and `build_pdf.py` (headless Chrome via Playwright) |
 
 ## Setup
 
