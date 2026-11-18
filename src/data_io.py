@@ -11,6 +11,7 @@ local metric plane (equirectangular around the track centroid). Over the few-km 
 trip the error of this projection is far below the GPS noise (~5 m), and it avoids picking
 a UTM zone per trip.
 """
+import os
 from dataclasses import dataclass
 from pathlib import Path
 import numpy as np
@@ -18,7 +19,8 @@ import pandas as pd
 
 EARTH_R = 6371008.8  # metres
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / "Student folder"
+# Local copy of the provided data (git-ignored). Override with PATHSNAP_DATA=/other/path if needed.
+DATA_ROOT = Path(os.environ.get("PATHSNAP_DATA", Path(__file__).resolve().parents[1] / "data" / "raw"))
 PARTITIONS = ("train", "student_test")
 
 

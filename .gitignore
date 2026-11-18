@@ -15,3 +15,6 @@ results/**/cache/
 # personal reference material, not part of the submission
 docs/
 PLAN.md
+
+# raw + processed data stay local
+data/
