@@ -1,0 +1,15 @@
+{
+  "params": {
+    "w_t": 5.3594167704559155,
+    "beta": 21.439990683148903,
+    "break_pen": 49.12616391130215,
+    "uturn_pen": 9.653786664964624,
+    "gap_s": 176.4746850117413,
+    "gap_pen": 8.379080865986008
+  },
+  "top_n": 8,
+  "reach_limit_m": 400.0,
+  "candidate_radius_m": 75.0,
+  "tuned_on": "30 random train trips, out-of-fold probabilities",
+  "n_trials": 60
+}
