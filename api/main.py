@@ -2,8 +2,9 @@
 
 Endpoints
   GET  /health                 model + data status
-  GET  /trips                  trip ids available on this server (and their number of GPS points)
-  POST /predict                body {"trip_id": "00000077", "include_network": false}
+  GET  /sets                   trip sets served (e.g. student_test, evaluator_test) and their number of trips
+  GET  /trips?trip_set=NAME    trip ids of one set (and their number of GPS points)
+  POST /predict                body {"trip_set": "evaluator_test", "trip_id": "00000015", "include_network": false}
                                -> GPS points, predicted route (geometry + arc ids), snapped points, metrics, timings
 
 The reference route (.route) stays on this machine: it is read ONLY by src/scoring.py after the prediction is made,
@@ -11,11 +12,12 @@ and only the resulting metrics are returned. The prediction pipeline (src/pipeli
 Every request is logged to this terminal (client address, trip, sizes, timings, metrics).
 
 Run (from the repo root, conda env ml_lab):
-  PATHSNAP_TRIPS_DIR=/path/to/trips  uvicorn api.main:app --host 0.0.0.0 --port 8000 --no-access-log
+  uvicorn api.main:app --host 0.0.0.0 --port 8000 --no-access-log
   (--no-access-log: our own middleware already logs every request with timings; this avoids duplicate lines)
   Laptop 2 then reaches it at http://<laptop-1-ip>:8000 (find the IP with `ip addr` / `ipconfig`).
-  PATHSNAP_TRIPS_DIR is a folder holding one sub-folder per trip (<id>/<id>.track|.nodes|.arcs[|.route]).
-  Default: data/raw/student_test (the development stand-in for the evaluator trips).
+Trip sets: each is a folder with one sub-folder per trip (<id>/<id>.track|.nodes|.arcs[|.route]).
+  Default: student_test = data/raw/student_test, evaluator_test = ../evaluator_test (next to the repo, never inside it).
+  Override: PATHSNAP_TRIP_SETS="student_test=/path/a;evaluator_test=/path/b"   (sets whose folder is missing are skipped)
 """
 import logging
 import os
@@ -34,7 +36,14 @@ from src.data_io import load_trip  # noqa: E402
 from src.pipeline import PathSnapModel  # noqa: E402
 from src.scoring import score  # noqa: E402
 
-TRIPS_DIR = Path(os.environ.get("PATHSNAP_TRIPS_DIR", ROOT / "data" / "raw" / "student_test")).resolve()
+def _trip_sets():
+    spec = os.environ.get("PATHSNAP_TRIP_SETS")
+    pairs = ([kv.split("=", 1) for kv in spec.split(";") if "=" in kv] if spec else
+             [("student_test", ROOT / "data" / "raw" / "student_test"), ("evaluator_test", ROOT.parent / "evaluator_test")])
+    return {name.strip(): Path(path).expanduser().resolve() for name, path in pairs if Path(path).expanduser().is_dir()}
+
+
+TRIP_SETS = _trip_sets()
 MAX_NETWORK_SEGMENTS = 20000
 
 log = logging.getLogger("pathsnap")
@@ -48,18 +57,28 @@ model = PathSnapModel(device="cpu")
 lock = threading.Lock()
 
 
-def list_trip_ids():
-    if not TRIPS_DIR.is_dir():
+def list_trip_ids(trip_set):
+    d = TRIP_SETS.get(trip_set)
+    if d is None:
         return []
-    return sorted(p.name for p in TRIPS_DIR.iterdir() if p.is_dir() and (p / f"{p.name}.track").exists())
+    return sorted(p.name for p in d.iterdir() if p.is_dir() and (p / f"{p.name}.track").exists())
 
 
-log.info(f"PathSnap API ready | trips dir: {TRIPS_DIR} | {len(list_trip_ids())} trips | model: {model.meta['model']} "
-         f"| radius {model.radius:.0f} m | HMM top-{model.top_n} | inference on CPU")
+def _check_set(trip_set):
+    if trip_set not in TRIP_SETS:
+        raise HTTPException(404, f"unknown trip set {trip_set!r}; available: {list(TRIP_SETS)}")
+
+
+log.info(f"PathSnap API ready | model: {model.meta['model']} | radius {model.radius:.0f} m | HMM top-{model.top_n} | inference on CPU")
+for _n, _d in TRIP_SETS.items():
+    log.info(f"  trip set {_n!r}: {len(list_trip_ids(_n))} trips from {_d}")
+if not TRIP_SETS:
+    log.warning("no trip set folder found; set PATHSNAP_TRIP_SETS")
 
 
 class PredictRequest(BaseModel):
     trip_id: str
+    trip_set: str = "student_test"
     include_network: bool = False
 
 
@@ -74,18 +93,24 @@ async def log_requests(request: Request, call_next):
 
 @app.get("/health")
 def health():
-    return dict(status="ok", model=model.meta["model"], trips_dir=str(TRIPS_DIR), n_trips=len(list_trip_ids()),
+    return dict(status="ok", model=model.meta["model"], trip_sets={k: len(list_trip_ids(k)) for k in TRIP_SETS},
                 candidate_radius_m=model.radius, hmm=model.hmm_cfg["params"])
 
 
+@app.get("/sets")
+def sets():
+    return dict(sets=[dict(name=k, n_trips=len(list_trip_ids(k))) for k in TRIP_SETS])
+
+
 @app.get("/trips")
-def trips():
+def trips(trip_set: str = "student_test"):
+    _check_set(trip_set)
     out = []
-    for tid in list_trip_ids():
-        with open(TRIPS_DIR / tid / f"{tid}.track") as f:
+    for tid in list_trip_ids(trip_set):
+        with open(TRIP_SETS[trip_set] / tid / f"{tid}.track") as f:
             n = sum(1 for line in f if line.strip())
         out.append(dict(trip_id=tid, n_points=n))
-    return dict(trips=out)
+    return dict(trip_set=trip_set, trips=out)
 
 
 def _latlon(nodes, ids):
@@ -110,15 +135,17 @@ def _route_chains(route, arcs, nodes):
 
 @app.post("/predict")
 def predict(req: PredictRequest, request: Request):
-    tid = req.trip_id.strip()
-    if tid not in list_trip_ids():                      # also blocks path traversal: only known folder names pass
-        log.warning(f"unknown trip id requested: {tid!r}")
-        raise HTTPException(404, f"unknown trip id {tid!r}")
+    tid, tset = req.trip_id.strip(), req.trip_set.strip()
+    _check_set(tset)
+    if tid not in list_trip_ids(tset):                  # also blocks path traversal: only known folder names pass
+        log.warning(f"unknown trip id requested: {tset}/{tid!r}")
+        raise HTTPException(404, f"unknown trip id {tid!r} in set {tset!r}")
     t0 = time.perf_counter()
-    trip = load_trip(TRIPS_DIR.name, tid, root=TRIPS_DIR.parent, with_route=True)
+    d = TRIP_SETS[tset]
+    trip = load_trip(d.name, tid, root=d.parent, with_route=True)
     t_load = time.perf_counter() - t0
     track, nodes, arcs = trip.track, trip.nodes, trip.arcs
-    log.info(f"[PREDICT] trip {tid} | {len(track)} GPS points | {len(nodes):,} nodes | {len(arcs):,} arcs")
+    log.info(f"[PREDICT] {tset}/{tid} | {len(track)} GPS points | {len(nodes):,} nodes | {len(arcs):,} arcs")
 
     with lock:
         pred = model.predict(track, nodes, arcs)        # sees only track + network, never trip.route
@@ -129,7 +156,7 @@ def predict(req: PredictRequest, request: Request):
     a0, a1 = _latlon(nodes, arcs[pred.point_arc, 0]), _latlon(nodes, arcs[pred.point_arc, 1])
     tt = np.where(np.isnan(pred.point_t), 0.5, pred.point_t)[:, None]
     snapped = a0 + (a1 - a0) * tt
-    body = dict(trip_id=tid, n_points=pred.n_points, n_candidate_rows=pred.n_candidate_rows,
+    body = dict(trip_id=tid, trip_set=tset, n_points=pred.n_points, n_candidate_rows=pred.n_candidate_rows,
                 n_filled_points=int(pred.point_filled.sum()), unbridged_joins=pred.unbridged,
                 gps=gps.round(7).tolist(), snapped=snapped.round(7).tolist(),
                 point_arc=pred.point_arc.tolist(), route_arc_ids=pred.route.tolist(),
@@ -145,7 +172,7 @@ def predict(req: PredictRequest, request: Request):
 
     total = time.perf_counter() - t0
     m = metrics or {}
-    log.info(f"[RESULT]  trip {tid} | top-1 {m.get('top1_cond', float('nan')):.4f} (classifier only "
+    log.info(f"[RESULT]  {tset}/{tid} | top-1 {m.get('top1_cond', float('nan')):.4f} (classifier only "
              f"{m.get('top1_clf_cond', float('nan')):.4f}) | continuity {pred.continuity:.4f} | route F1 "
              f"{m.get('route_f1', float('nan')):.4f} | route {len(pred.route)} arcs | pipeline {pred.timings['total_s']:.2f}s "
              f"| request {total:.2f}s")

@@ -6,7 +6,8 @@ The UI never reads trip files or reference routes: everything it shows comes fro
 
 Run:  PATHSNAP_API_URL=http://<laptop-1-ip>:8000  streamlit run ui/app.py
       (the API address can also be changed in the sidebar)
-Needs only: streamlit, streamlit-folium, folium, requests, pandas.
+Needs only ui/requirements.txt (streamlit, streamlit-folium, folium, requests, pandas): no model, no data.
+The trip set selector lists whatever sets the API serves (student_test, evaluator_test).
 """
 import os
 import time
@@ -32,9 +33,13 @@ def api_get(base, path, timeout=10):
     r = requests.get(base.rstrip("/") + path, timeout=timeout); r.raise_for_status(); return r.json()
 
 
-def api_predict(base, trip_id):
+SET_LABELS = {"student_test": "Student test (development)", "evaluator_test": "Evaluator test (final evaluation)"}
+
+
+def api_predict(base, trip_set, trip_id):
     t0 = time.perf_counter()
-    r = requests.post(base.rstrip("/") + "/predict", json=dict(trip_id=trip_id, include_network=True), timeout=300)
+    r = requests.post(base.rstrip("/") + "/predict", json=dict(trip_set=trip_set, trip_id=trip_id, include_network=True),
+                      timeout=300)
     r.raise_for_status()
     body = r.json(); body["_roundtrip_s"] = time.perf_counter() - t0
     return body
@@ -42,7 +47,8 @@ def api_predict(base, trip_id):
 
 def record(body):
     m = body.get("metrics") or {}
-    ss.history.append(dict(time=time.strftime("%H:%M:%S"), trip_id=body["trip_id"], gps_points=body["n_points"],
+    ss.history.append(dict(time=time.strftime("%H:%M:%S"), trip_set=body["trip_set"], trip_id=body["trip_id"],
+                           gps_points=body["n_points"],
                            top1_hmm=m.get("top1_cond"), top1_classifier=m.get("top1_clf_cond"),
                            continuity=m.get("continuity"), route_f1=m.get("route_f1"),
                            pipeline_s=body["timings"]["total_s"], roundtrip_s=round(body["_roundtrip_s"], 2)))
@@ -90,13 +96,14 @@ def build_map(d, show_network, show_snapped):
     folium.LayerControl(collapsed=True).add_to(m)
     m.fit_bounds([[min(lats), min(lons)], [max(lats), max(lons)]])
     legend = f"""
-    <div style="position: fixed; bottom: 24px; left: 24px; z-index: 9999; background: white; padding: 8px 12px;
-                border: 1px solid #ccc; border-radius: 6px; font: 13px sans-serif; line-height: 1.6;">
-      <b>Trip {d['trip_id']}</b><br>
-      <span style="color:{COL['gps']}">&#9679;</span> raw GPS point<br>
-      <span style="color:{COL['predicted']}">&#9644;&#9644;</span> predicted route (HMM)<br>
-      <span style="color:{COL['snapped']}">&#9679;</span> snapped position<br>
-      <span style="color:{COL['network']}">&#9644;&#9644;</span> road network
+    <div style="position: fixed; bottom: 24px; left: 24px; z-index: 9999; background: #ffffff; color: #1f1f1f;
+                padding: 8px 12px; border: 1px solid #bbb; border-radius: 6px; font: 13px sans-serif; line-height: 1.6;
+                box-shadow: 0 1px 4px rgba(0,0,0,.25);">
+      <b style="color:#1f1f1f">Trip {d['trip_id']}</b> <span style="color:#555">({d['trip_set']})</span><br>
+      <span style="color:{COL['gps']}">&#9679;</span> <span style="color:#1f1f1f">raw GPS point</span><br>
+      <span style="color:{COL['predicted']}">&#9644;&#9644;</span> <span style="color:#1f1f1f">predicted route (HMM)</span><br>
+      <span style="color:{COL['snapped']}">&#9679;</span> <span style="color:#1f1f1f">snapped position</span><br>
+      <span style="color:{COL['network']}">&#9644;&#9644;</span> <span style="color:#1f1f1f">road network</span>
     </div>"""
     m.get_root().html.add_child(folium.Element(legend))
     return m
@@ -113,11 +120,15 @@ with st.sidebar:
     api = st.text_input("API address (Laptop 1)", os.environ.get("PATHSNAP_API_URL", "http://localhost:8000"))
     try:
         health = api_get(api, "/health", timeout=5)
-        trips = api_get(api, "/trips")["trips"]
-        st.success(f"Connected · {health['n_trips']} trips · {health['model']}")
+        sets = [x["name"] for x in api_get(api, "/sets")["sets"]]
+        st.success(f"Connected · {health['model']}")
     except Exception as e:
         st.error(f"Cannot reach the API at {api}\n\n{type(e).__name__}: {e}")
         st.stop()
+    if not sets:
+        st.error("The API serves no trip sets."); st.stop()
+    trip_set = st.radio("Trip set", sets, format_func=lambda k: f"{SET_LABELS.get(k, k)} · {health['trip_sets'][k]} trips")
+    trips = api_get(api, f"/trips?trip_set={trip_set}")["trips"]
 
     labels = {t["trip_id"]: f"{t['trip_id']}  ({t['n_points']:,} GPS points)" for t in trips}
     trip_id = st.selectbox("Evaluation trip", list(labels), format_func=labels.get)
@@ -132,14 +143,15 @@ with st.sidebar:
 if run:
     with st.spinner(f"API is processing trip {trip_id} …"):
         try:
-            ss.results[trip_id] = api_predict(api, trip_id); record(ss.results[trip_id])
+            ss.results[(trip_set, trip_id)] = api_predict(api, trip_set, trip_id); record(ss.results[(trip_set, trip_id)])
         except Exception as e:
             st.error(f"Prediction failed for trip {trip_id}: {e}")
 if run_all:
     bar = st.progress(0.0, text="Running all trips …")
     for k, t in enumerate(trips):
         try:
-            ss.results[t["trip_id"]] = api_predict(api, t["trip_id"]); record(ss.results[t["trip_id"]])
+            key = (trip_set, t["trip_id"])
+            ss.results[key] = api_predict(api, trip_set, t["trip_id"]); record(ss.results[key])
         except Exception as e:
             st.error(f"Prediction failed for trip {t['trip_id']}: {e}")
         bar.progress((k + 1) / len(trips), text=f"Trip {t['trip_id']} done")
@@ -147,7 +159,8 @@ if run_all:
 
 # ---------------------------------------------------------------- main view
 st.header("Route reconstruction")
-d = ss.results.get(trip_id)
+st.caption(f"Trip set: **{SET_LABELS.get(trip_set, trip_set)}** · trip **{trip_id}**")
+d = ss.results.get((trip_set, trip_id))
 if d is None:
     st.info("Choose a trip in the sidebar and press **Reconstruct route**. The API (Laptop 1) runs the full pipeline: "
             "candidate roads → features → tuned XGBoost → HMM/Viterbi → stitched route, then scores it server-side.")
@@ -165,7 +178,7 @@ else:
         st.warning("This trip has no reference route on the server, so only the prediction is shown.")
 
     st_folium(build_map(d, show_network, show_snapped), height=640, use_container_width=True, returned_objects=[],
-              key=f"map_{trip_id}_{show_network}_{show_snapped}")
+              key=f"map_{trip_set}_{trip_id}_{show_network}_{show_snapped}")
 
     left, right = st.columns([1, 1])
     with left:
@@ -192,8 +205,9 @@ if ss.history:
     h = pd.DataFrame(ss.history)
     fmt = {c: "{:.2%}" for c in ["top1_hmm", "top1_classifier", "continuity", "route_f1"]}
     st.dataframe(h.style.format(fmt, na_rep="n/a"), width="stretch", hide_index=True)
-    done = {r["trip_id"]: r for r in ss.history}
-    if len(done) > 1:
-        last = pd.DataFrame(done.values())
-        st.caption(f"{len(done)} distinct trips run · mean top-1 {last.top1_hmm.mean():.2%} · "
-                   f"mean route F1 {last.route_f1.mean():.2%} · mean API time {last.pipeline_s.mean():.2f} s")
+    done = {(r["trip_set"], r["trip_id"]): r for r in ss.history}
+    last = pd.DataFrame(done.values())
+    for name, g in last.groupby("trip_set"):
+        st.caption(f"**{SET_LABELS.get(name, name)}**: {len(g)} distinct trips run · mean top-1 {g.top1_hmm.mean():.2%} · "
+                   f"mean classifier-only {g.top1_classifier.mean():.2%} · mean route F1 {g.route_f1.mean():.2%} · "
+                   f"mean API time {g.pipeline_s.mean():.2f} s")
