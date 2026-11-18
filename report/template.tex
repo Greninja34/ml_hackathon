@@ -1,0 +1,111 @@
+% PathSnap report template for pandoc -> pdflatex.
+% Uses only packages available in a minimal TeX Live (Computer Modern, OT1); Unicode symbols are declared below.
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage[a4paper,margin=18mm,headheight=14pt]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{array,calc,longtable,booktabs,tabularx}
+\usepackage{float}
+\usepackage[font=small,labelfont=bf,labelsep=period,skip=4pt]{caption}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{etoolbox}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{accent}{HTML}{B3263A}
+\definecolor{muted}{HTML}{566170}
+\definecolor{soft}{HTML}{F2F4F7}
+
+% ---- Unicode used in the text (pdflatex + OT1)
+\DeclareUnicodeCharacter{03B1}{\ensuremath{\alpha}}
+\DeclareUnicodeCharacter{03B2}{\ensuremath{\beta}}
+\DeclareUnicodeCharacter{03B3}{\ensuremath{\gamma}}
+\DeclareUnicodeCharacter{03B4}{\ensuremath{\delta}}
+\DeclareUnicodeCharacter{03BB}{\ensuremath{\lambda}}
+\DeclareUnicodeCharacter{03B7}{\ensuremath{\eta}}
+\DeclareUnicodeCharacter{03A3}{\ensuremath{\Sigma}}
+\DeclareUnicodeCharacter{2192}{\ensuremath{\rightarrow}}
+\DeclareUnicodeCharacter{2190}{\ensuremath{\leftarrow}}
+\DeclareUnicodeCharacter{2248}{\ensuremath{\approx}}
+\DeclareUnicodeCharacter{00B1}{\ensuremath{\pm}}
+\DeclareUnicodeCharacter{2265}{\ensuremath{\geq}}
+\DeclareUnicodeCharacter{2264}{\ensuremath{\leq}}
+\DeclareUnicodeCharacter{00D7}{\ensuremath{\times}}
+\DeclareUnicodeCharacter{2212}{\ensuremath{-}}
+\DeclareUnicodeCharacter{00B7}{\ensuremath{\cdot}}
+\DeclareUnicodeCharacter{00B0}{\ensuremath{^\circ}}
+\DeclareUnicodeCharacter{00B2}{\ensuremath{^2}}
+\DeclareUnicodeCharacter{2026}{\ldots}
+\DeclareUnicodeCharacter{2016}{\ensuremath{\|}}
+
+% ---- layout
+\setlength{\parindent}{0pt}
+\sloppy\setlength{\emergencystretch}{3em} % long file paths in \texttt cannot break; let spaces stretch instead
+\setlength{\parskip}{4pt plus 1pt}
+\setlist{itemsep=1pt,topsep=2pt,parsep=0pt}
+\renewcommand{\labelitemi}{\ensuremath{\bullet}}\renewcommand{\labelitemii}{\ensuremath{\circ}} % no TS1 fonts needed
+\providecommand{\tightlist}{\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}}
+\titleformat{\section}{\Large\bfseries\color{accent}}{\thesection}{0.6em}{}[{\color{accent}\titlerule[0.8pt]}]
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+\titlespacing*{\subsubsection}{0pt}{8pt}{3pt}
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small\color{muted}PathSnap: technical report}
+\fancyhead[R]{\small\color{muted}UE24CS352A}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% tables: smaller type, a little more row height
+\AtBeginEnvironment{longtable}{\footnotesize\renewcommand{\arraystretch}{1.15}}
+\setlength{\LTpre}{4pt}\setlength{\LTpost}{6pt}
+\makeatletter\@ifundefined{c@none}{\newcounter{none}}{}\makeatother % pandoc 3 uses \LTcaptype{none} for uncaptioned tables
+% figures stay where they are written
+\makeatletter\def\fps@figure{H}\makeatother
+
+% images from pandoc 3
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{%
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}\else\usebox{\pandoc@box}\fi}
+\makeatother
+
+\hypersetup{pdftitle={$title$},pdfauthor={$team$}}
+
+\begin{document}
+
+% ---- title page
+\begin{titlepage}
+\vspace*{10mm}
+{\small\color{accent}\MakeUppercase{$course$}}\par\vspace{8mm}
+{\raggedright\huge\bfseries $title$\par}\vspace{4mm}
+{\Large\color{muted} $subtitle$\par}\vspace{16mm}
+\begin{tabular}{@{}p{0.28\linewidth}p{0.62\linewidth}@{}}
+\toprule
+Team name & $team$ \\
+Members (name, SRN) & $members$ \\
+Repository & \url{$repo$} \\
+Date & $date$ \\
+\bottomrule
+\end{tabular}
+\vfill
+\noindent\colorbox{soft}{\parbox{\dimexpr\linewidth-2\fboxsep}{\small\vspace{4pt}$abstract$\vspace{4pt}}}
+\vspace{6mm}
+{\small\color{muted} Every number, table and figure in this report was produced by the code in the repository; the file it comes from is named with each figure or table (paths relative to the repository root).}
+\end{titlepage}
+
+\tableofcontents
+\vspace{4mm}
+
+$body$
+
+\end{document}

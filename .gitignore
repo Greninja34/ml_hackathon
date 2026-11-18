@@ -18,3 +18,6 @@ PLAN.md
 
 # raw + processed data stay local
 data/
+
+# LaTeX intermediate files of the report build
+report/build/
