@@ -1,0 +1,14 @@
+{
+  "seed": 42,
+  "cv": "GroupKFold(5) by trip",
+  "cv_eval_points_per_fold": 15000,
+  "models": {
+    "Logistic Regression": "C=1, lbfgs, 40k pts",
+    "Gaussian Naive Bayes": "var_smoothing=1e-9",
+    "KNN": "k=25, distance-weighted, 8k pts",
+    "Random Forest": "150 trees, depth 16, leaf 5, 40k pts",
+    "LightGBM": "300 trees, lr 0.1, 63 leaves",
+    "XGBoost": "300 trees, lr 0.1, depth 8",
+    "MLP": "64-32 ReLU, adam, early stop, 40k pts"
+  }
+}
