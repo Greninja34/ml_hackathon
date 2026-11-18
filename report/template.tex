@@ -8,7 +8,8 @@
 \usepackage{xcolor}
 \usepackage{array,calc,longtable,booktabs,tabularx}
 \usepackage{float}
-\usepackage[font=small,labelfont=bf,labelsep=period,skip=4pt]{caption}
+\usepackage[font={small,it},labelfont={bf,up},labelsep=colon,skip=4pt]{caption} % italic captions
+\usepackage{changepage} % adjustwidth: indented model sub-sections
 \usepackage{enumitem}
 \usepackage{fancyhdr}
 \usepackage{titlesec}
@@ -49,12 +50,14 @@
 \setlist{itemsep=1pt,topsep=2pt,parsep=0pt}
 \renewcommand{\labelitemi}{\ensuremath{\bullet}}\renewcommand{\labelitemii}{\ensuremath{\circ}} % no TS1 fonts needed
 \providecommand{\tightlist}{\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}}
-\titleformat{\section}{\Large\bfseries\color{accent}}{\thesection}{0.6em}{}[{\color{muted}\titlerule[0.4pt]}]
-\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.6em}{}
-\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
-\titlespacing*{\section}{0pt}{14pt}{6pt}
-\titlespacing*{\subsection}{0pt}{10pt}{4pt}
-\titlespacing*{\subsubsection}{0pt}{8pt}{3pt}
+% heading levels: section = H2, subsection = H3, subsubsection = H4 (no deeper levels; no rules under headings)
+\titleformat{\section}{\Large\bfseries\color{accent}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{accent}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{accent}}{\thesubsubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{0pt}{8pt}
+\titlespacing*{\subsection}{0pt}{12pt}{4pt}
+\titlespacing*{\subsubsection}{0pt}{9pt}{3pt}
+\setcounter{secnumdepth}{3}
 \pagestyle{empty} % no header, no page numbers
 \pretocmd{\section}{\clearpage}{}{} % every numbered section starts on a new page
 
@@ -62,6 +65,11 @@
 \AtBeginEnvironment{longtable}{\footnotesize\renewcommand{\arraystretch}{1.15}}
 \setlength{\LTpre}{4pt}\setlength{\LTpost}{6pt}
 \makeatletter\@ifundefined{c@none}{\newcounter{none}}{}\makeatother % pandoc 3 uses \LTcaptype{none} for uncaptioned tables
+% tables: kept on one page (a table that does not fit moves to the next page); right-aligned numbers, wrapping text columns
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcolumntype{R}{>{\raggedleft\arraybackslash}X}
+\newenvironment{rtable}{\par\medskip\noindent\begin{minipage}{\linewidth}\footnotesize\renewcommand{\arraystretch}{1.25}\setlength{\tabcolsep}{4pt}}{\end{minipage}\par\medskip}
+\newcommand{\hd}[1]{\begin{tabular}[b]{@{}c@{}}#1\end{tabular}} % two-line column header
 % figures stay where they are written
 \makeatletter\def\fps@figure{H}\makeatother
 
