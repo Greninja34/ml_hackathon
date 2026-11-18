@@ -21,3 +21,4 @@ data/
 
 # LaTeX intermediate files of the report build
 report/build/
+report/missfont.log
