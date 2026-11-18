@@ -55,11 +55,8 @@
 \titlespacing*{\section}{0pt}{14pt}{6pt}
 \titlespacing*{\subsection}{0pt}{10pt}{4pt}
 \titlespacing*{\subsubsection}{0pt}{8pt}{3pt}
-\pagestyle{fancy}\fancyhf{}
-\fancyhead[L]{\small\color{muted}PathSnap: technical report}
-\fancyhead[R]{\small\color{muted}UE24CS352A}
-\fancyfoot[C]{\small\thepage}
-\renewcommand{\headrulewidth}{0.4pt}
+\pagestyle{empty} % no header, no page numbers
+\newcommand{\sectionbreak}{\clearpage} % every numbered section starts on a new page
 
 % tables: smaller type, a little more row height
 \AtBeginEnvironment{longtable}{\footnotesize\renewcommand{\arraystretch}{1.15}}
@@ -107,9 +104,6 @@ $endif$
 {\small\color{muted} Every number, table and figure in this report was produced by the code in the repository; the file it comes from is named with each figure or table (paths are relative to the repository root).\par}
 \end{titlepage}
 \restoregeometry
-
-\tableofcontents
-\vspace{4mm}
 
 $body$
 
