@@ -1,15 +1,50 @@
 {
   "params": {
-    "w_t": 5.3594167704559155,
-    "beta": 21.439990683148903,
-    "break_pen": 49.12616391130215,
-    "uturn_pen": 9.653786664964624,
-    "gap_s": 176.4746850117413,
-    "gap_pen": 8.379080865986008
+    "w_t": 7.985417689438617,
+    "beta": 13.751229902592366,
+    "break_pen": 147.81131485944422,
+    "uturn_pen": 25.885099424360416,
+    "gap_s": 298.98668173266776,
+    "gap_pen": 24.645268039262515
   },
   "top_n": 8,
   "reach_limit_m": 400.0,
   "candidate_radius_m": 75.0,
-  "tuned_on": "30 random train trips, out-of-fold probabilities",
-  "n_trials": 60
+  "stitch_limit_m": 1500.0,
+  "tuned_on": "all 78 reliable train trips, out-of-fold probabilities",
+  "objective": "top1_cond",
+  "n_trials": 150,
+  "seed": 42,
+  "search_space": {
+    "w_t": {
+      "low": 0.2,
+      "high": 30.0,
+      "log": true
+    },
+    "beta": {
+      "low": 5.0,
+      "high": 200.0,
+      "log": true
+    },
+    "break_pen": {
+      "low": 2.0,
+      "high": 200.0,
+      "log": false
+    },
+    "uturn_pen": {
+      "low": 0.0,
+      "high": 40.0,
+      "log": false
+    },
+    "gap_s": {
+      "low": 5.0,
+      "high": 600.0,
+      "log": false
+    },
+    "gap_pen": {
+      "low": 0.0,
+      "high": 30.0,
+      "log": false
+    }
+  }
 }

@@ -9,10 +9,14 @@ Transition     : from arc a (point k-1) to arc b (point k), using the road netwo
     cost = min(|d - delta| / beta, break_pen)   where delta = straight-line distance between the two GPS points
     unreachable                       -> cost = break_pen
     exact reverse of a (U-turn)       -> cost += uturn_pen
-    time gap dt > gap_s               -> every transition costs gap_pen (topology cannot be trusted after a long pause)
+    time gap dt > gap_s               -> the vehicle may have driven far beyond `reach_limit`, so being unreachable is
+                                         expected: unreachable pairs cost gap_pen instead of break_pen and no transition
+                                         costs more than gap_pen; reachable, consistent pairs are still preferred
     log T = - w_t * cost
 Viterbi        : best chain maximises  sum_k [ log p_k(state_k) + log T_k(state_{k-1}, state_k) ].
-Points with no candidate are skipped by the chain (they get a fallback later); the chain simply links the points around them.
+Points with no candidate are skipped by the chain; `fill_missing` gives them the arc of the nearest decoded point in time.
+`stitch_route` turns the per-point arcs into one arc sequence, filling non-adjacent consecutive arcs with the shortest
+network path (bounded), so the returned route is drivable wherever the network allows it.
 """
 import heapq
 from dataclasses import dataclass
@@ -28,8 +32,8 @@ class HMMParams:
     beta: float = 30.0        # metres of route-vs-straight-line mismatch that cost 1 nat
     break_pen: float = 8.0    # cost of an unreachable / wildly inconsistent transition (nats before weighting)
     uturn_pen: float = 4.0    # extra cost of jumping to the exact reverse arc
-    gap_s: float = 20.0       # time gap above which topology is ignored
-    gap_pen: float = 2.0      # flat cost of any transition after such a gap
+    gap_s: float = 20.0       # time gap (s) above which unreachability is no longer treated as a break
+    gap_pen: float = 2.0      # cap on any transition cost after such a gap (and the cost of an unreachable pair)
 
 
 class TripGraph:
@@ -43,6 +47,8 @@ class TripGraph:
         self.indptr = np.r_[0, np.cumsum(np.bincount(self.u, minlength=n))].tolist()
         self.nbr = self.v[order].tolist()
         self.w = self.len[order].tolist()
+        self.aid = order.tolist()                       # arc id of every adjacency entry
+        self.u_list = self.u.tolist()
         self.limit = limit
         self._cache = {}
 
@@ -63,6 +69,29 @@ class TripGraph:
                     dist[y] = nd; heapq.heappush(h, (nd, y))
         self._cache[s] = dist
         return dist
+
+    def path(self, s, t, limit=1500.0):
+        """Arc ids of the shortest path node s -> node t (bounded by `limit` metres), or None if not reachable."""
+        if s == t:
+            return []
+        dist, prev, h = {s: 0.0}, {}, [(0.0, s)]
+        indptr, nbr, w, aid = self.indptr, self.nbr, self.w, self.aid
+        while h:
+            d, x = heapq.heappop(h)
+            if x == t:
+                break
+            if d > dist[x]:
+                continue
+            for k in range(indptr[x], indptr[x + 1]):
+                y, nd = nbr[k], d + w[k]
+                if nd <= limit and nd < dist.get(y, 1e18):
+                    dist[y] = nd; prev[y] = aid[k]; heapq.heappush(h, (nd, y))
+        if t not in prev:
+            return None
+        out, x = [], t
+        while x != s:
+            a = prev[x]; out.append(a); x = self.u_list[a]
+        return out[::-1]
 
 
 def build_steps(pt_idx, arc_id, prob, t_frac, P, t, G, top_n=TOP_N):
@@ -107,12 +136,9 @@ def decode(steps, prm: HMMParams):
     score = steps[0]["lp"].copy()
     back = [None]
     for s in steps[1:]:
-        if s["dt"] > prm.gap_s:
-            cost = np.full(s["R"].shape, prm.gap_pen)
-        else:
-            cost = np.where(np.isnan(s["R"]), prm.break_pen,
-                            np.minimum(np.abs(s["R"] - s["delta"]) / prm.beta, prm.break_pen))
-            cost = cost + prm.uturn_pen * s["rev"]
+        cap = prm.gap_pen if s["dt"] > prm.gap_s else prm.break_pen
+        cost = np.where(np.isnan(s["R"]), cap, np.minimum(np.abs(s["R"] - s["delta"]) / prm.beta, cap))
+        cost = cost + prm.uturn_pen * s["rev"]
         M = score[:, None] - prm.w_t * cost
         bp = M.argmax(0)
         score = s["lp"] + M[bp, np.arange(M.shape[1])]
@@ -126,3 +152,41 @@ def decode(steps, prm: HMMParams):
 
 def classifier_only(steps):
     return np.array([int(s["lp"].argmax()) for s in steps], dtype=int)
+
+
+def chosen_arcs(steps, idx):
+    """Arc id chosen at every step."""
+    return np.array([s["arc"][i] for s, i in zip(steps, idx)], dtype=np.int64)
+
+
+def fill_missing(n_points, step_pts, arcs):
+    """One arc per GPS point: points without candidates take the arc of the nearest decoded point (by index;
+    ties go to the earlier point). Returns (arc per point, bool mask of filled points)."""
+    step_pts = np.asarray(step_pts, dtype=np.int64); arcs = np.asarray(arcs, dtype=np.int64)
+    if len(step_pts) == 0:
+        return np.full(n_points, -1, dtype=np.int64), np.ones(n_points, bool)
+    allp = np.arange(n_points)
+    right = np.clip(np.searchsorted(step_pts, allp), 0, len(step_pts) - 1)
+    left = np.clip(right - 1, 0, len(step_pts) - 1)
+    j = np.where(np.abs(allp - step_pts[left]) <= np.abs(step_pts[right] - allp), left, right)
+    out = arcs[j]
+    filled = np.ones(n_points, bool); filled[step_pts] = False
+    return out, filled
+
+
+def stitch_route(arcs, G, limit=1500.0):
+    """Collapse repeated arcs and join non-adjacent consecutive arcs by the shortest network path.
+    Returns (route arc ids, number of joins that could not be bridged within `limit`)."""
+    route, breaks = [], 0
+    for a in arcs:
+        a = int(a)
+        if route and a == route[-1]:
+            continue
+        if route and G.v[route[-1]] != G.u[a]:
+            p = G.path(int(G.v[route[-1]]), int(G.u[a]), limit)
+            if p is None:
+                breaks += 1
+            else:
+                route.extend(p)
+        route.append(a)
+    return np.array(route, dtype=np.int64), breaks
