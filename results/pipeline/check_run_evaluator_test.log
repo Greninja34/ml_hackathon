@@ -1,0 +1,14 @@
+model loaded in 0.3s (CPU inference); partition evaluator_test
+  00000015:  6854 pts | top1 0.9205 (classifier only 0.6584) | continuity 0.9902 | route F1 0.8171 | 0.65s
+  00000017:  1346 pts | top1 0.9539 (classifier only 0.9376) | continuity 0.8848 | route F1 0.9775 | 0.38s
+  00000023:   458 pts | top1 0.9716 (classifier only 0.9432) | continuity 0.9847 | route F1 0.9516 | 0.13s
+  00000030:   654 pts | top1 0.8379 (classifier only 0.8012) | continuity 0.9005 | route F1 0.9607 | 0.22s
+  00000049:  2642 pts | top1 0.9962 (classifier only 0.9902) | continuity 0.9947 | route F1 0.9988 | 0.24s
+  00000059:  1031 pts | top1 0.9816 (classifier only 0.9670) | continuity 0.9272 | route F1 0.9774 | 0.23s
+  00000067:   916 pts | top1 0.9356 (classifier only 0.9509) | continuity 0.9891 | route F1 1.0000 | 0.10s
+  00000073:  1144 pts | top1 0.9843 (classifier only 0.9825) | continuity 0.9921 | route F1 0.9958 | 0.16s
+  00000087:  1399 pts | top1 0.9957 (classifier only 0.9535) | continuity 0.9900 | route F1 0.9989 | 0.24s
+  00000094:  3230 pts | top1 0.9508 (classifier only 0.9276) | continuity 0.9724 | route F1 0.9789 | 0.44s
+
+pooled top1_cond: HMM 0.9493 | classifier only 0.8473 | mean route F1 0.9657 | mean time per trip 0.28s (max 0.65s)
+total 3.7s

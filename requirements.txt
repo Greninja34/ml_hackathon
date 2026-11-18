@@ -1,0 +1,21 @@
+# Laptop 1 / full pipeline (training, evaluation, API). Python 3.13 (3.11+ should work). Tested versions.
+# Laptop 2 needs only ui/requirements.txt.
+numpy==2.4.6
+pandas==3.0.3
+pyarrow==23.0.1
+scipy==1.18.1
+scikit-learn==1.9.1
+xgboost==3.4.1          # GPU (device="cuda") was used for training; the API runs on CPU
+lightgbm==4.7.0
+optuna==5.1.0
+torch==2.14.1           # MLP baseline only (scripts/05_models.py)
+shapely==2.2.0
+matplotlib==3.11.1
+tabulate==0.10.0        # pandas .to_markdown() in result summaries
+folium==1.0.0
+fastapi==0.163.2
+uvicorn==0.54.0
+pydantic==2.14.3
+streamlit==1.64.0
+streamlit-folium==0.27.4
+requests==2.34.2

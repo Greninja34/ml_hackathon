@@ -2,8 +2,10 @@
 trip from the RAW files, score it server-side (src/scoring.py), and compare with the Phase 6 offline results
 (results/hmm/per_trip_student_test.csv). Small differences are expected only from CPU vs GPU XGBoost inference.
 
-Outputs: results/pipeline/check_student_test.csv, results/pipeline/check_run.log
+Outputs: results/pipeline/check_<partition>.csv, results/pipeline/check_run_<partition>.log
 Run: python scripts/11_check_pipeline.py [partition]
+     evaluator trips (kept OUTSIDE the repo, next to it):  PATHSNAP_DATA=.. python scripts/11_check_pipeline.py evaluator_test
+     (a single final evaluation run: nothing in the model or decoder is changed after it)
 """
 import sys, time
 from pathlib import Path
@@ -29,7 +31,7 @@ class Tee:
 
 
 def main():
-    sys.stdout = Tee(OUT / "check_run.log")
+    sys.stdout = Tee(OUT / f"check_run_{PART}.log")
     t0 = time.time()
     model = PathSnapModel(device="cpu")
     print(f"model loaded in {time.time()-t0:.1f}s (CPU inference); partition {PART}", flush=True)
