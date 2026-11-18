@@ -50,7 +50,7 @@ def record(body):
     ss.history.append(dict(time=time.strftime("%H:%M:%S"), trip_set=body["trip_set"], trip_id=body["trip_id"],
                            gps_points=body["n_points"],
                            top1_hmm=m.get("top1_cond"), top1_classifier=m.get("top1_clf_cond"),
-                           continuity=m.get("continuity"), route_f1=m.get("route_f1"),
+                           continuity=m.get("continuity"), route_f1=m.get("route_f1"), points_scored=m.get("n_points_scored"),
                            pipeline_s=body["timings"]["total_s"], roundtrip_s=round(body["_roundtrip_s"], 2)))
 
 
@@ -144,6 +144,7 @@ if run:
     with st.spinner(f"API is processing trip {trip_id} …"):
         try:
             ss.results[(trip_set, trip_id)] = api_predict(api, trip_set, trip_id); record(ss.results[(trip_set, trip_id)])
+            ss[f"seg_{trip_set}"] = trip_id
         except Exception as e:
             st.error(f"Prediction failed for trip {trip_id}: {e}")
 if run_all:
@@ -156,15 +157,10 @@ if run_all:
             st.error(f"Prediction failed for trip {t['trip_id']}: {e}")
         bar.progress((k + 1) / len(trips), text=f"Trip {t['trip_id']} done")
     bar.empty()
+    ss[f"seg_{trip_set}"] = trips[0]["trip_id"]
 
 # ---------------------------------------------------------------- main view
-st.header("Route reconstruction")
-st.caption(f"Trip set: **{SET_LABELS.get(trip_set, trip_set)}** · trip **{trip_id}**")
-d = ss.results.get((trip_set, trip_id))
-if d is None:
-    st.info("Choose a trip in the sidebar and press **Reconstruct route**. The API (Laptop 1) runs the full pipeline: "
-            "candidate roads → features → tuned XGBoost → HMM/Viterbi → stitched route, then scores it server-side.")
-else:
+def metric_row(d):
     m = d.get("metrics") or {}
     c = st.columns(5)
     gain = None if m.get("top1_cond") is None or m.get("top1_clf_cond") is None else 100 * (m["top1_cond"] - m["top1_clf_cond"])
@@ -177,10 +173,10 @@ else:
     if not m:
         st.warning("This trip has no reference route on the server, so only the prediction is shown.")
 
-    st_folium(build_map(d, show_network, show_snapped), height=640, use_container_width=True, returned_objects=[],
-              key=f"map_{trip_set}_{trip_id}_{show_network}_{show_snapped}")
 
-    left, right = st.columns([1, 1])
+def trip_summary(d):
+    m = d.get("metrics") or {}
+    left, right = st.columns(2)
     with left:
         st.subheader("Trip summary")
         st.table(pd.DataFrame({"value": {
@@ -200,14 +196,98 @@ else:
         with st.expander("Model and decoder settings"):
             st.json(d["model"])
 
-if ss.history:
-    st.subheader("Requests made from this UI")
+
+def set_table(set_name):
+    """One row per trip of this set that has been run (latest result), straight from the API responses."""
+    rows = []
+    for (sname, tid), d in ss.results.items():
+        if sname != set_name:
+            continue
+        m = d.get("metrics") or {}
+        rows.append(dict(trip_id=tid, gps_points=d["n_points"], points_scored=m.get("n_points_scored"),
+                         top1_hmm=m.get("top1_cond"), top1_classifier=m.get("top1_clf_cond"),
+                         continuity=m.get("continuity"), route_f1=m.get("route_f1"), api_time_s=d["timings"]["total_s"]))
+    return pd.DataFrame(rows).sort_values("trip_id").reset_index(drop=True) if rows else pd.DataFrame()
+
+
+def conclusions(set_name, df, n_available):
+    st.subheader(f"All trips run: {SET_LABELS.get(set_name, set_name)}")
+    if df.empty:
+        st.info("No trip of this set has been run yet. Use **Run all trips** in the sidebar.")
+        return
+    if len(df) < n_available:
+        st.caption(f"{len(df)} of {n_available} trips run so far; press **Run all {n_available} trips** for the full picture.")
+    scored = df.dropna(subset=["top1_hmm"])
+    fmt = {c: "{:.2%}" for c in ["top1_hmm", "top1_classifier", "continuity", "route_f1"]}
+    fmt.update(gps_points="{:,}", points_scored="{:,.0f}", api_time_s="{:.2f}")
+    st.dataframe(df.style.format(fmt, na_rep="n/a"), width="stretch", hide_index=True)
+    if scored.empty:
+        return
+    w = scored.points_scored
+    pooled, pooled_clf = (scored.top1_hmm * w).sum() / w.sum(), (scored.top1_classifier * w).sum() / w.sum()
+    c = st.columns(4)
+    c[0].metric("Pooled top-1 (classifier + HMM)", f"{pooled:.2%}", f"{100 * (pooled - pooled_clf):+.2f} pts vs classifier only")
+    c[1].metric("Pooled top-1 (classifier only)", f"{pooled_clf:.2%}")
+    c[2].metric("Mean route F1", f"{scored.route_f1.mean():.2%}")
+    c[3].metric("Mean API time per trip", f"{df.api_time_s.mean():.2f} s", f"slowest {df.api_time_s.max():.2f} s", delta_color="off")
+
+    st.markdown("**Top-1 accuracy per trip: classifier only vs classifier + HMM**")
+    chart = scored.set_index("trip_id")[["top1_classifier", "top1_hmm"]].rename(
+        columns={"top1_classifier": "classifier only", "top1_hmm": "classifier + HMM"}) * 100
+    st.bar_chart(chart, stack=False, y_label="top-1 accuracy (%)", color=["#9aa0a6", "#e63946"], height=320)
+
+    gain = 100 * (scored.top1_hmm - scored.top1_classifier)
+    helped, hurt = scored[gain > 0], scored[gain < 0]
+    best, worst = scored.loc[scored.top1_hmm.idxmax()], scored.loc[scored.top1_hmm.idxmin()]
+    low_f1, low_cont = scored.loc[scored.route_f1.idxmin()], scored.loc[scored.continuity.idxmin()]
+    big = scored.loc[gain.idxmax()]
+    lines = [
+        f"- Over **{len(scored)} trips** ({int(w.sum()):,} scored GPS points) the full pipeline matches **{pooled:.2%}** of points "
+        f"to the reference road, against **{pooled_clf:.2%}** for the classifier alone (**{100 * (pooled - pooled_clf):+.2f} points**).",
+        f"- The HMM improved top-1 on **{len(helped)} of {len(scored)}** trips; the largest gain was trip **{big.trip_id}** "
+        f"({big.top1_classifier:.1%} → {big.top1_hmm:.1%}).",
+        (f"- It lowered top-1 on **{len(hurt)}** trip(s): " + ", ".join(
+            f"**{r.trip_id}** ({r.top1_classifier:.1%} → {r.top1_hmm:.1%})" for r in hurt.itertuples()) + "."
+         if len(hurt) else "- It never lowered top-1 on these trips."),
+        f"- Best trip: **{best.trip_id}** ({best.top1_hmm:.2%}). Weakest trip: **{worst.trip_id}** ({worst.top1_hmm:.2%}, "
+        f"continuity {worst.continuity:.1%}).",
+        f"- Lowest route F1: **{low_f1.trip_id}** ({low_f1.route_f1:.1%}); lowest continuity: **{low_cont.trip_id}** "
+        f"({low_cont.continuity:.1%}).",
+        f"- Every trip was processed by the API in **{df.api_time_s.max():.2f} s or less** (mean {df.api_time_s.mean():.2f} s).",
+    ]
+    st.markdown("**Conclusions (computed from the results above)**\n\n" + "\n".join(lines))
+
+
+st.header("Route reconstruction")
+done_here = sorted(tid for (sname, tid) in ss.results if sname == trip_set)
+if not done_here:
+    st.caption(f"Trip set: **{SET_LABELS.get(trip_set, trip_set)}**")
+    st.info("Choose a trip in the sidebar and press **Reconstruct route**, or press **Run all trips**. The API (Laptop 1) "
+            "runs the full pipeline: candidate roads → features → tuned XGBoost → HMM/Viterbi → stitched route, then scores "
+            "it server-side.")
+    if ss.history:
+        with st.expander("Request log"):
+            st.dataframe(pd.DataFrame(ss.history), width="stretch", hide_index=True)
+    st.stop()
+
+seg_key = f"seg_{trip_set}"
+if ss.get(seg_key) not in done_here:
+    ss[seg_key] = trip_id if trip_id in done_here else done_here[0]
+shown = st.segmented_control(f"Trips reconstructed · {SET_LABELS.get(trip_set, trip_set)} ({len(done_here)} of {len(trips)})",
+                             done_here, key=seg_key) or done_here[0]
+d = ss.results[(trip_set, shown)]
+metric_row(d)
+
+tab_map, tab_trip, tab_all, tab_log = st.tabs(["🗺️ Map", "📋 Trip summary", "📊 All trips & conclusions", "🧾 Request log"])
+with tab_map:
+    st_folium(build_map(d, show_network, show_snapped), height=640, use_container_width=True, returned_objects=[],
+              key=f"map_{trip_set}_{shown}_{show_network}_{show_snapped}")
+with tab_trip:
+    trip_summary(d)
+with tab_all:
+    conclusions(trip_set, set_table(trip_set), len(trips))
+with tab_log:
+    st.caption("Every request this UI sent to the API in this session (the API terminal on Laptop 1 logs the same requests).")
     h = pd.DataFrame(ss.history)
     fmt = {c: "{:.2%}" for c in ["top1_hmm", "top1_classifier", "continuity", "route_f1"]}
     st.dataframe(h.style.format(fmt, na_rep="n/a"), width="stretch", hide_index=True)
-    done = {(r["trip_set"], r["trip_id"]): r for r in ss.history}
-    last = pd.DataFrame(done.values())
-    for name, g in last.groupby("trip_set"):
-        st.caption(f"**{SET_LABELS.get(name, name)}**: {len(g)} distinct trips run · mean top-1 {g.top1_hmm.mean():.2%} · "
-                   f"mean classifier-only {g.top1_classifier.mean():.2%} · mean route F1 {g.route_f1.mean():.2%} · "
-                   f"mean API time {g.pipeline_s.mean():.2f} s")
