@@ -6,8 +6,6 @@ team: "[fill in]"
 members: "[fill in] \\newline [fill in] \\newline [fill in]"
 repo: "https://github.com/Greninja34/ml_hackathon"
 date: "18 November 2026"
-abstract: |
-  **Summary.** PathSnap snaps noisy GPS points onto a road network. For every GPS point it scores all road arcs within 75 m with a Bayesian-tuned XGBoost classifier (18 relative geometric features); a hidden Markov model decoded with Viterbi then chooses the arc sequence that is both probable and drivable on the network. On the 10 student-testing trips, observation-level top-1 accuracy is 89.95 % for the classifier alone and **96.51 %** after HMM decoding (route continuity 93.8 % → 98.2 %). A single final run on the 10 evaluator trips, after every choice was frozen, gives 84.73 % → **94.93 %**. The system is served by a FastAPI backend (Laptop 1) and a Streamlit + Folium UI (Laptop 2).
 ---
 
 # Problem and approach
@@ -72,7 +70,7 @@ The files are complete and internally consistent. The real data-quality problems
 1. **Metric projection per trip.** Longitude and latitude are angles: a degree of longitude is 111 km at the equator but about 56 km at 60° N. Trips lie in different countries, so each trip is projected to its own local plane around the mean of its GPS points, $x = (\lambda-\lambda_0)\,R\cos\varphi_0$, $y = (\varphi-\varphi_0)\,R$, $R = 6{,}371{,}008.8$ m. Over a few kilometres the projection error is far below the ~5 m GPS noise, and no UTM zone has to be chosen per trip (`src/data_io.py`).
 2. **Per-point labels.** `.route` lists arcs, not points (trip 1: 1,315 points, 525 arcs). Each point is aligned to one route position by dynamic programming: the position may stay or move forward in time, never backward, at a cost equal to the point-to-arc distance plus 0.05 m per skipped arc. The alignment is forward-only on all 90 trips, with a median point-to-arc distance of 4–7 m on normal trips (`src/labeling.py`). Labels are used only for training and scoring.
 3. **Reliability flag.** Trips whose median GPS-to-reference distance exceeds 15 m (33: 122 m; 54: 140 m) are excluded from training; their labels would teach noise.
-4. **Candidates.** All arcs within R of each point via a shapely STRtree; R = 75 m from the radius sweep (Figure 10).
+4. **Candidates.** All arcs within R of each point via a shapely STRtree; R = 75 m from the radius sweep (Figure \ref{fig:radius}).
 5. **Training rows.** Rows of reliable trips whose reference arc is among the candidates: 2,880,132 rows from 181,659 points (6.3 % positive). Points whose reference arc is not a candidate are counted as candidate misses, not model errors.
 6. **Scaling.** Models that need it (Logistic Regression, Naive Bayes, KNN, MLP) use a StandardScaler fitted inside each pipeline on the training rows of that fit only.
 
@@ -94,7 +92,9 @@ The files are complete and internally consistent. The real data-quality problems
 - **Sampling.** Mostly 1 Hz, so consecutive points are near-duplicates: data must be split by trip, never by point.
 - **Fragmented networks** (median 19 weak components per trip) and small breaks in some reference routes (minimum connected share 0.981): the decoder must tolerate unconnected transitions rather than forbid them.
 
-![Candidate-radius sweep (`results/candidates/radius_summary.csv`; train + student_test, reliable trips in green). At 75 m the reference arc is missing for 0.8 % of points of reliable trips (2.3 % at 30 m, 1.3 % at 50 m, 0.6 % at 100 m) at about 16 candidates per point.](../results/candidates/radius_sweep.png){width=88%}
+![Interactive Folium map of train trip 3 (`results/eda/trip_00000003_map.html`, made by `scripts/02_trip_map.py`): raw GPS observations, road network and reference route, with switchable base and data layers. Partition: train.](img/folium_eda_trip3.png){width=96%}
+
+![Candidate-radius sweep (`results/candidates/radius_summary.csv`; train + student_test, reliable trips in green). At 75 m the reference arc is missing for 0.8 % of points of reliable trips (2.3 % at 30 m, 1.3 % at 50 m, 0.6 % at 100 m) at about 16 candidates per point.](../results/candidates/radius_sweep.png){#fig:radius width=88%}
 
 ## Features extracted and why
 
@@ -199,7 +199,7 @@ Each model answers A (understanding), B (training and configuration) and C (resu
 
 **B5–B6.** Layers 64-32, ReLU, Adam (lr 1e-3), batch 4,096, up to 40 epochs, early stopping after 5 epochs without improvement on an internal 10 % validation split, standardised inputs. Loss: binary cross-entropy.
 
-**C7–C9.** Top-1 0.8871, macro F1 0.9340 (precision 0.9443, recall 0.9243), log loss 0.0330. Train 0.8965 vs test 0.8871 (0.9 points): well generalised. It is the only model with an epoch-wise history (Figure 18).
+**C7–C9.** Top-1 0.8871, macro F1 0.9340 (precision 0.9443, recall 0.9243), log loss 0.0330. Train 0.8965 vs test 0.8871 (0.9 points): well generalised. It is the only model with an epoch-wise history (Figure \ref{fig:mlp}).
 
 ## Model visualisations
 
@@ -216,7 +216,7 @@ Each model answers A (understanding), B (training and configuration) and C (resu
 
 ```{=latex}
 \begin{figure}[H]\centering
-\begin{minipage}[t]{0.42\linewidth}\centering\includegraphics[width=\linewidth]{../results/models/mlp_training_curve.png}\caption{MLP training and validation loss per epoch (real history; train partition with an internal 10\,\% hold-out).}\end{minipage}\hfill
+\begin{minipage}[t]{0.42\linewidth}\centering\includegraphics[width=\linewidth]{../results/models/mlp_training_curve.png}\caption{MLP training and validation loss per epoch (real history; train partition with an internal 10\,\% hold-out).}\label{fig:mlp}\end{minipage}\hfill
 \begin{minipage}[t]{0.56\linewidth}\centering\includegraphics[width=\linewidth]{../results/models/quality_vs_speed.png}\caption{Quality vs inference cost (student\_test). KNN is two to three orders of magnitude slower.}\end{minipage}
 \end{figure}
 ```
@@ -254,12 +254,12 @@ The ranges bracket the library defaults on both sides; the regularisation ranges
 
 Source: `results/tuning/tuned_vs_untuned.csv` (both models measured in the same run, on the same data and partitions).
 
-Yes, on every metric, but by a small margin: +0.12 points CV top-1, +0.43 points student-test top-1 and slightly better calibrated probabilities, at unchanged inference speed. Most completed trials scored within 0.003 of each other, so the default configuration was already close to the plateau; the model is limited by the information in the features more than by its hyperparameters. The search moved toward deeper trees held back by stronger pruning and shrinkage (γ 0 → 1.66, α 0 → 3.43) and by row and column subsampling, consistent with the overfitting measured in Section 3.2.6. Importance estimated from the completed trials (Figure 21) ranks `reg_lambda` and `colsample_bytree` highest and `learning_rate` and `max_depth` lowest; with only 12 completed trials this ranking is indicative.
+Yes, on every metric, but by a small margin: +0.12 points CV top-1, +0.43 points student-test top-1 and slightly better calibrated probabilities, at unchanged inference speed. Most completed trials scored within 0.003 of each other, so the default configuration was already close to the plateau; the model is limited by the information in the features more than by its hyperparameters. The search moved toward deeper trees held back by stronger pruning and shrinkage (γ 0 → 1.66, α 0 → 3.43) and by row and column subsampling, consistent with the overfitting measured in Section 3.2.6. Importance estimated from the completed trials (Figure \ref{fig:paramimp}) ranks `reg_lambda` and `colsample_bytree` highest and `learning_rate` and `max_depth` lowest; with only 12 completed trials this ranking is indicative.
 
 ```{=latex}
 \begin{figure}[H]\centering
 \begin{minipage}[t]{0.52\linewidth}\centering\includegraphics[width=\linewidth]{../results/tuning/optimization_history.png}\caption{Optimisation history: CV top-1 per trial and best so far (train, 5-fold grouped CV).}\end{minipage}\hfill
-\begin{minipage}[t]{0.46\linewidth}\centering\includegraphics[width=\linewidth]{../results/tuning/param_importance.png}\caption{Hyperparameter importance (Optuna, completed trials).}\end{minipage}
+\begin{minipage}[t]{0.46\linewidth}\centering\includegraphics[width=\linewidth]{../results/tuning/param_importance.png}\caption{Hyperparameter importance (Optuna, completed trials).}\label{fig:paramimp}\end{minipage}
 \end{figure}
 ```
 
@@ -325,8 +325,6 @@ Maps are generated by `src/viz.py` (`build_trip_map`) from `scripts/02_trip_map.
 
 ![Student-test trip 77 (Syktyvkar): raw GPS (blue), road network (grey), reference route (green) and HMM-predicted route (red) on the satellite base layer. This is the trip where the HMM helped most (78.2 % → 95.9 % top-1).](img/folium_hmm_trip77.png){width=100%}
 
-![EDA map of train trip 3: GPS observations, road network and reference route (`results/eda/trip_00000003_map.html`).](img/folium_eda_trip3.png){width=100%}
-
 \newpage
 
 # API, UI and deployment
@@ -380,10 +378,3 @@ Accuracy on the unseen evaluator trips (94.9 %) is close to student_test (96.5 %
 ## Conclusions
 
 Treating map matching as candidate classification plus sequence decoding works well on this dataset. Most of the classifier's accuracy comes from direction features that separate arcs from their reverse twins (−23 points when removed); the choice among strong tabular models matters far less. The HMM is the largest single improvement after the features: it raises observation-level accuracy from 90.0 % to 96.5 % on student_test and route F1 from 0.81 to 0.98, and it carries over to the unseen evaluator trips (94.9 %). The full pipeline runs in well under a second per trip on a CPU and is deployed as a two-laptop API and UI with ground truth kept server-side.
-
-# Academic integrity, reproducibility and AI-assistance disclosure
-
-- **Leakage control.** Splits and cross-validation are by trip; scalers are fitted inside pipelines on training rows; features contain no ids or absolute coordinates; model, hyperparameter and decoder choices used training data (cross-validation or out-of-fold probabilities) only; student_test was used for development comparisons only; the evaluator trips were used once, at the end, and are kept outside the repository.
-- **No hardcoded outputs.** Every prediction is computed live from the raw files; the prediction code never reads `.route`; the API logs every request.
-- **Reproducibility.** Seed 42 throughout; scripts `01`–`11` regenerate every table and figure (see the README); configurations, trial records (`trials.csv`, `study.db`, `decoder_trials.csv`) and run logs are committed. XGBoost and the MLP were trained on an NVIDIA GPU, which is not bit-for-bit deterministic, so reruns may differ in the last decimals. This report is built from `report/report.md` with pandoc and pdflatex (`report/build_pdf.sh`).
-- **AI assistance.** The team used an AI coding assistant (Claude Code) during development, for writing and reviewing code, debugging, preparing visualisations and drafting documentation, including drafting this report. All experiments were executed by the team on its own machine, every number in this report is taken from the committed result files, and the team has reviewed the content and can explain and reproduce it.

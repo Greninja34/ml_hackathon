@@ -85,23 +85,33 @@
 
 % ---- title page
 \begin{titlepage}
-\vspace*{10mm}
-{\small\color{accent}\MakeUppercase{$course$}}\par\vspace{8mm}
-{\raggedright\huge\bfseries $title$\par}\vspace{4mm}
-{\Large\color{muted} $subtitle$\par}\vspace{16mm}
-\begin{tabular}{@{}p{0.28\linewidth}p{0.62\linewidth}@{}}
-\toprule
-Team name & $team$ \\
-Members (name, SRN) & $members$ \\
-Repository & \url{$repo$} \\
-Date & $date$ \\
-\bottomrule
-\end{tabular}
+\newgeometry{margin=24mm}
+{\color{accent}\rule{\linewidth}{1.2pt}}\par\vspace{3mm}
+{\small\color{muted}\MakeUppercase{$course$}\par}
+\vspace*{0.2\textheight}
+{\raggedright\Huge\bfseries $title$\par}
+\vspace{5mm}
+{\Large\color{muted} $subtitle$\par}
+\vspace{5mm}
+{\color{accent}\rule{0.3\linewidth}{2.5pt}}\par
 \vfill
-\noindent\colorbox{soft}{\parbox{\dimexpr\linewidth-2\fboxsep}{\small\vspace{4pt}$abstract$\vspace{4pt}}}
-\vspace{6mm}
-{\small\color{muted} Every number, table and figure in this report was produced by the code in the repository; the file it comes from is named with each figure or table (paths relative to the repository root).}
+\renewcommand{\arraystretch}{1.5}
+\begin{tabular}{@{}>{\leavevmode\small\color{muted}}p{0.27\linewidth}>{\raggedright\arraybackslash}p{0.66\linewidth}@{}}
+TEAM & $team$ \\
+MEMBERS (NAME, SRN) & $members$ \\
+REPOSITORY & \texttt{$repo$} \\
+DATE & $date$ \\
+\end{tabular}
+$if(abstract)$
+\par\vspace{8mm}
+\noindent\colorbox{soft}{\parbox{\dimexpr\linewidth-2\fboxsep}{\vspace{5pt}\small $abstract$\par\vspace{5pt}}}
+$endif$
+\par\vspace{10mm}
+{\small\color{muted} Every number, table and figure in this report was produced by the code in the repository; the file it comes from is named with each figure or table (paths are relative to the repository root).\par}
+\vspace{3mm}
+\noindent\textcolor{accent}{\rule{\linewidth}{1.2pt}}\par
 \end{titlepage}
+\restoregeometry
 
 \tableofcontents
 \vspace{4mm}
