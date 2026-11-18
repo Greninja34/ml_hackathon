@@ -139,7 +139,7 @@ def main():
                          test_log_loss=log_loss(yst, np.clip(prob, 1e-6, 1 - 1e-6)),
                          route_continuity=route_continuity(st.trip_id.to_numpy(), st.arc_id.to_numpy(), idx, arcs_by_trip),
                          train_time_s=fit_s, inference_ms_per_1k_rows=1000 * inf_s / (len(st) / 1000), params=json.dumps(p)))
-        if "tuned" in name and "un" not in name:
+        if name.endswith("(Bayesian)"):
             bst.save_model(str(ROOT / "artifacts" / "xgb_tuned.json"))
         print(f"  {name}: test top1={rows[-1]['test_top1']:.4f} F1={rows[-1]['test_macro_f1']:.4f} "
               f"logloss={rows[-1]['test_log_loss']:.4f} cont={rows[-1]['route_continuity']:.4f} fit={fit_s:.1f}s", flush=True)

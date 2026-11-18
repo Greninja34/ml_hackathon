@@ -1,0 +1,38 @@
+{
+  "model": "XGBoost (Optuna-tuned)",
+  "features": [
+    "dist",
+    "t_frac",
+    "dist_minus_min",
+    "dist_rank",
+    "n_cands",
+    "cos_heading",
+    "heading_ok",
+    "ds_span",
+    "has_reverse",
+    "d_prev",
+    "d_next",
+    "d_mean_win",
+    "speed_ms",
+    "arc_len",
+    "deg_out_end",
+    "deg_in_start",
+    "dt_prev",
+    "dt_next"
+  ],
+  "candidate_radius_m": 75.0,
+  "params": {
+    "n_estimators": 408,
+    "learning_rate": 0.09066626085072911,
+    "max_depth": 10,
+    "min_child_weight": 1.1699925034644665,
+    "subsample": 0.6074301266029157,
+    "colsample_bytree": 0.6542928074908804,
+    "reg_lambda": 0.237419823705227,
+    "reg_alpha": 3.430617591578822,
+    "gamma": 1.6630372950682422
+  },
+  "seed": 42,
+  "fit_seconds": 8.502031564712524,
+  "student_test_top1_after_reload": 0.899524531062229
+}
