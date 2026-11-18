@@ -22,7 +22,6 @@ from sklearn.metrics import confusion_matrix, f1_score, log_loss, precision_scor
 from sklearn.model_selection import GroupKFold
 from sklearn.naive_bayes import GaussianNB
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 import lightgbm as lgb
@@ -33,6 +32,7 @@ from src.config import RANDOM_SEED as SEED
 from src.data_io import DATA_ROOT
 from src.features import FEATURES
 from src.plotstyle import COLORS, MODEL_COLORS, apply, finish
+from src.torch_mlp import TorchMLP
 
 warnings.filterwarnings("ignore")
 apply()
@@ -40,17 +40,19 @@ ROOT = Path(__file__).resolve().parents[1]
 PROC = ROOT / "data" / "processed"
 OUT = ROOT / "results" / "models"; OUT.mkdir(parents=True, exist_ok=True)
 N_JOBS = 32
-CV_EVAL_POINTS = 15000      # held-out points scored per fold (keeps slow models tractable)
+# Every model trains on ALL rows of the training folds, except KNN (see note). Held-out folds are scored in full.
+EVAL_CAP = {"KNN": 15000}   # KNN must compare every query with every stored row, so it is subsampled
+CV_EVAL_POINTS = EVAL_CAP
 
 # name -> (family, estimator, max training POINTS used per fit or None for all, config summary)
 MODELS = {
-    "Logistic Regression": ("Linear", make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=300, random_state=SEED)), 40000, "C=1, lbfgs, 40k pts"),
+    "Logistic Regression": ("Linear", make_pipeline(StandardScaler(), LogisticRegression(C=1.0, max_iter=300, random_state=SEED)), None, "C=1, lbfgs, all rows"),
     "Gaussian Naive Bayes": ("Probabilistic", make_pipeline(StandardScaler(), GaussianNB()), None, "var_smoothing=1e-9"),
     "KNN": ("Instance-based", make_pipeline(StandardScaler(), KNeighborsClassifier(n_neighbors=25, weights="distance", n_jobs=N_JOBS)), 8000, "k=25, distance-weighted, 8k pts"),
-    "Random Forest": ("Bagging ensemble", RandomForestClassifier(n_estimators=150, max_depth=16, min_samples_leaf=5, n_jobs=N_JOBS, random_state=SEED), 40000, "150 trees, depth 16, leaf 5, 40k pts"),
+    "Random Forest": ("Bagging ensemble", RandomForestClassifier(n_estimators=100, max_depth=16, min_samples_leaf=5, max_samples=0.25, n_jobs=N_JOBS, random_state=SEED), None, "100 trees, depth 16, leaf 5, each tree on a 25% bootstrap of all rows"),
     "LightGBM": ("Gradient boosting", lgb.LGBMClassifier(n_estimators=300, learning_rate=0.1, num_leaves=63, n_jobs=N_JOBS, random_state=SEED, verbose=-1), None, "300 trees, lr 0.1, 63 leaves"),
-    "XGBoost": ("Gradient boosting", xgb.XGBClassifier(n_estimators=300, learning_rate=0.1, max_depth=8, tree_method="hist", n_jobs=N_JOBS, random_state=SEED, verbosity=0), None, "300 trees, lr 0.1, depth 8"),
-    "MLP": ("Neural network", make_pipeline(StandardScaler(), MLPClassifier(hidden_layer_sizes=(64, 32), batch_size=512, max_iter=60, early_stopping=True, random_state=SEED)), 40000, "64-32 ReLU, adam, early stop, 40k pts"),
+    "XGBoost": ("Gradient boosting", xgb.XGBClassifier(n_estimators=300, learning_rate=0.1, max_depth=8, tree_method="hist", device="cuda", random_state=SEED, verbosity=0), None, "300 trees, lr 0.1, depth 8, GPU"),
+    "MLP": ("Neural network", TorchMLP(hidden=(64, 32), lr=1e-3, batch_size=4096, max_epochs=40, patience=5, seed=SEED), None, "64-32 ReLU, Adam, BCE, early stop, GPU, all rows"),
 }
 
 
@@ -118,7 +120,7 @@ def main():
         folds, fit_times = [], []
         for k, (a, b) in enumerate(gkf.split(tr, groups=tr.trip_id)):
             fit_df = sample_points(tr.iloc[a], cap, rng)
-            ev_df = sample_points(tr.iloc[b], CV_EVAL_POINTS, rng)
+            ev_df = sample_points(tr.iloc[b], EVAL_CAP.get(name), rng)
             m = clone(est); t0 = time.time()
             m.fit(fit_df[FEATURES].to_numpy(), fit_df.label.to_numpy()); fit_times.append(time.time() - t0)
             prob = m.predict_proba(ev_df[FEATURES].to_numpy())[:, 1]
@@ -135,7 +137,7 @@ def main():
         cont = continuity(best, arcs_by_trip, st.arc_id.to_numpy())
         cms[name] = confusion_matrix(st.label.to_numpy(), pred)
         if name == "MLP":
-            curves[name] = (m[-1].loss_curve_, m[-1].validation_scores_)
+            curves[name] = (m.loss_curve_, m.val_loss_curve_)
         train_acc, _, _ = (None, None, None)
         tr_eval = sample_points(tr, 15000, rng)
         tr_prob = m.predict_proba(tr_eval[FEATURES].to_numpy())[:, 1]
@@ -156,7 +158,7 @@ def main():
     res = pd.DataFrame(rows)
     res.to_csv(OUT / "model_comparison.csv", index=False)
     (OUT / "model_comparison.md").write_text(res.round(4).to_markdown(index=False))
-    json.dump({"seed": SEED, "cv": "GroupKFold(5) by trip", "cv_eval_points_per_fold": CV_EVAL_POINTS,
+    json.dump({"seed": SEED, "cv": "GroupKFold(5) by trip", "cv_eval_points_per_fold": "all (KNN: 15000)",
                "models": {k: v[3] for k, v in MODELS.items()}}, open(OUT / "experiment_config.json", "w"), indent=2)
 
     # ---------- figures ----------
@@ -197,10 +199,10 @@ def main():
     if curves:
         loss, val = curves["MLP"]
         fig, ax = plt.subplots(figsize=(7, 4.2))
-        ax.plot(loss, color=COLORS["train"], label="training loss"); ax.set_xlabel("epoch"); ax.set_ylabel("log-loss")
-        ax2 = ax.twinx(); ax2.plot(val, color=COLORS["student_test"], label="validation score (accuracy)"); ax2.set_ylabel("validation accuracy"); ax2.grid(False)
-        ax.set_title("MLP training history (real epochs)"); ax.legend(loc="center right")
-        finish(fig, OUT / "mlp_training_curve.png", "Partition: train (internal 10% early-stopping split)")
+        ax.plot(range(1, len(loss) + 1), loss, color=COLORS["train"], label="training loss")
+        ax.plot(range(1, len(val) + 1), val, color=COLORS["student_test"], label="validation loss")
+        ax.set_xlabel("epoch"); ax.set_ylabel("binary cross-entropy"); ax.set_title("MLP training history (GPU, real epochs)"); ax.legend()
+        finish(fig, OUT / "mlp_training_curve.png", "Partition: train (internal 10% of rows held out for early stopping)")
     print("\n", res[["model", "cv_macro_f1_mean", "test_top1", "test_macro_f1", "test_log_loss", "route_continuity", "train_time_s"]].round(4).to_string(index=False))
 
 
