@@ -11,8 +11,6 @@ import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
@@ -20,6 +18,9 @@ from scipy.spatial import cKDTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.data_io import PARTITIONS, list_trips, load_trip, project, point_segment_distance
+from src.plotstyle import COLORS, apply, finish
+
+apply()
 
 OUT = Path(__file__).resolve().parents[1] / "results" / "eda"
 OUT.mkdir(parents=True, exist_ok=True)
@@ -102,25 +103,38 @@ def main():
     df = pd.DataFrame(rows)
     df.to_csv(OUT / "inventory.csv", index=False)
 
-    # ---- plots ----
-    def hist(col, title, fname, log=False, xlabel=None):
-        fig, ax = plt.subplots(figsize=(6, 4))
-        for part, c in zip(PARTITIONS, ("tab:blue", "tab:orange")):
-            ax.hist(df.loc[df.partition == part, col], bins=25, alpha=.7, label=part, color=c, log=log)
-        ax.set_title(title); ax.set_xlabel(xlabel or col); ax.set_ylabel("trips"); ax.legend()
-        fig.tight_layout(); fig.savefig(OUT / fname, dpi=130); plt.close(fig)
+    # ---- plots (shared style) ----
+    def hist(col, title, fname, log=False, xlabel=None, unit=""):
+        fig, ax = plt.subplots(figsize=(7, 4.2))
+        lo, hi = df[col].min(), df[col].max()
+        bins = np.logspace(np.log10(max(lo, 1e-3)), np.log10(hi + 1), 28) if log and lo > 0 else 28
+        for part in PARTITIONS:
+            v = df.loc[df.partition == part, col]
+            ax.hist(v, bins=bins, alpha=.75, color=COLORS[part], edgecolor="white",
+                    label=f"{part} (n={len(v)}, median {v.median():,.1f}{unit})")
+        if log and lo > 0:
+            ax.set_xscale("log")
+        ax.set_title(title); ax.set_xlabel(xlabel or col); ax.set_ylabel("number of trips"); ax.legend()
+        finish(fig, OUT / fname, "Source: results/eda/inventory.csv (train 80 trips + student_test 10 trips)")
 
-    hist("n_points", "GPS points per trip", "hist_points_per_trip.png", log=True)
-    hist("n_arcs", "Road arcs per trip network", "hist_arcs_per_trip.png", log=True)
-    hist("n_route_arcs", "Reference-route length (arcs)", "hist_route_arcs.png")
-    hist("dt_max", "Largest time gap per trip (s)", "hist_max_gap.png", log=True)
-    hist("noise_median_m", "Median GPS-to-route distance (m)", "hist_noise_median.png")
+    hist("n_points", "GPS points per trip", "hist_points_per_trip.png", log=True, xlabel="GPS points (log scale)")
+    hist("n_arcs", "Road arcs in each trip's network", "hist_arcs_per_trip.png", log=True, xlabel="arcs (log scale)")
+    hist("n_route_arcs", "Reference-route length", "hist_route_arcs.png", xlabel="arcs in reference route")
+    hist("dt_max", "Largest time gap within each trip", "hist_max_gap.png", log=True, xlabel="seconds (log scale)", unit=" s")
+    hist("noise_median_m", "Median distance from GPS point to reference route", "hist_noise_median.png",
+         xlabel="metres", unit=" m")
 
     allnoise = np.concatenate(noise_all)
-    fig, ax = plt.subplots(figsize=(6, 4))
-    ax.hist(np.clip(allnoise, 0, 60), bins=60); ax.set_yscale("log")
-    ax.set_title("GPS-to-reference-route distance, all points (clipped at 60 m)")
-    ax.set_xlabel("metres"); fig.tight_layout(); fig.savefig(OUT / "hist_noise_all_points.png", dpi=130); plt.close(fig)
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    ax.hist(np.clip(allnoise, 0, 60), bins=60, color=COLORS["train"], edgecolor="white")
+    ax.set_yscale("log")
+    for pc, c in ((50, COLORS["reference"]), (90, COLORS["student_test"]), (99, COLORS["predicted"])):
+        v = np.percentile(allnoise, pc)
+        ax.axvline(min(v, 60), color=c, ls="--", lw=1.6, label=f"p{pc} = {v:.1f} m")
+    ax.set_title("GPS-to-reference-route distance, all points")
+    ax.set_xlabel("metres (clipped at 60; the tail reaches %.0f m)" % allnoise.max()); ax.set_ylabel("GPS points (log scale)")
+    ax.legend()
+    finish(fig, OUT / "hist_noise_all_points.png", "Source: train 80 + student_test 10 trips")
 
     # ---- summary markdown ----
     n_tr = (df.partition == "train").sum(); n_st = (df.partition == "student_test").sum()
