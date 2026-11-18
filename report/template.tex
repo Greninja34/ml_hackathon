@@ -20,6 +20,7 @@
 \definecolor{accent}{HTML}{1F2A37}
 \definecolor{muted}{HTML}{566170}
 \definecolor{soft}{HTML}{F2F4F7}
+\definecolor{linkblue}{HTML}{1A56C4}
 
 % ---- Unicode used in the text (pdflatex + OT1)
 \DeclareUnicodeCharacter{03B1}{\ensuremath{\alpha}}
@@ -101,7 +102,7 @@
 \begin{tabular}{@{}>{\leavevmode\small\color{muted}}p{0.27\linewidth}>{\raggedright\arraybackslash}p{0.66\linewidth}@{}}
 TEAM & $team$ \\
 MEMBERS (NAME, SRN) & $members$ \\
-REPOSITORY & \texttt{$repo$} \\
+REPOSITORY & \href{$repo$}{\color{linkblue}\texttt{$repo$}} \\
 DATE & $date$ \\
 \end{tabular}
 $if(abstract)$
