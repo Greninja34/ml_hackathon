@@ -1,0 +1,29 @@
+model loaded in 0.4s (CPU inference); partition student_test
+  00000000:  2503 pts | top1 0.9744 (classifier only 0.9561) | continuity 0.9964 | route F1 0.9700 | 0.26s
+  00000007:  1354 pts | top1 0.9993 (classifier only 0.9668) | continuity 1.0000 | route F1 0.9918 | 0.17s
+  00000009:  1049 pts | top1 0.9152 (classifier only 0.8818) | continuity 0.9485 | route F1 0.9624 | 0.33s
+  00000040:  2995 pts | top1 0.9890 (classifier only 0.9533) | continuity 0.9943 | route F1 0.9952 | 0.34s
+  00000052:   262 pts | top1 0.9962 (classifier only 0.9733) | continuity 0.9617 | route F1 0.9894 | 0.14s
+  00000056:  3958 pts | top1 0.9672 (classifier only 0.9141) | continuity 0.9671 | route F1 0.9953 | 0.62s
+  00000065:   768 pts | top1 0.8815 (classifier only 0.8529) | continuity 0.9804 | route F1 0.9732 | 0.26s
+  00000076:  1486 pts | top1 0.9758 (classifier only 0.9273) | continuity 0.9731 | route F1 0.9752 | 0.49s
+  00000077:  3911 pts | top1 0.9588 (classifier only 0.7824) | continuity 0.9877 | route F1 0.9520 | 0.62s
+  00000091:   874 pts | top1 0.9279 (classifier only 0.9005) | continuity 0.9702 | route F1 0.9702 | 0.23s
+
+pooled top1_cond: HMM 0.9651 | classifier only 0.8995 | mean route F1 0.9775 | mean time per trip 0.35s (max 0.62s)
+
+against Phase 6 offline results (difference in points):
+         top1_cond  route_f1  hmm_top1  hmm_route_f1_full  d_top1_pts  d_f1_pts
+trip_id                                                                        
+0           0.9744    0.9700    0.9744             0.9700         0.0       0.0
+7           0.9993    0.9918    0.9993             0.9918         0.0       0.0
+9           0.9152    0.9624    0.9152             0.9624        -0.0       0.0
+40          0.9890    0.9952    0.9890             0.9952         0.0       0.0
+52          0.9962    0.9894    0.9962             0.9894        -0.0       0.0
+56          0.9672    0.9953    0.9672             0.9953         0.0       0.0
+65          0.8815    0.9732    0.8815             0.9732         0.0       0.0
+76          0.9758    0.9752    0.9758             0.9752         0.0       0.0
+77          0.9588    0.9520    0.9588             0.9520         0.0      -0.0
+91          0.9279    0.9702    0.9279             0.9702         0.0       0.0
+max |difference|: top-1 0.000 pts, route F1 0.000 pts
+total 5.0s
