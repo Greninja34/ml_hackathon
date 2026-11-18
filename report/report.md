@@ -33,22 +33,16 @@ The data was split into training (80 tracks), student test (10 tracks) and evalu
 
 ```{=latex}
 \begin{rtable}
-\begin{tabularx}{\linewidth}{@{}L r@{}}
+\begin{tabularx}{\linewidth}{@{}L r @{\hspace{14pt}} L r@{}}
 \toprule
-\textbf{Item} & \textbf{Value} \\
+\textbf{Item} & \textbf{Value} & \textbf{Item} & \textbf{Value} \\
 \midrule
-Trips (train / student\_test / evaluator) & 80 / 10 / 10 \\
-GPS points (train + student\_test) & 227,577 \\
-Points per trip (min / median / max) & 262 / 1,496 / 19,313 \\
-Arcs per trip (min / median / max) & 649 / 18,761 / 307,392 \\
-Route arcs per trip (min / median / max) & 59 / 272 / 2,266 \\
-Steps exactly 1 s apart (mean over trips) & 94.3 \% \\
-Trips with a time gap $>$ 60 s & 23 \\
-Largest time gap & 153,064 s \\
-Arcs with a reverse twin (mean over trips) & 92.2 \% \\
-Weakly connected components per trip (median / max) & 19 / 421 \\
-Largest-component share of nodes (min over trips) & 0.693 \\
-Reference route fully connected (min over trips) & 0.9813 \\
+Trips (train / student\_test / evaluator) & 80 / 10 / 10 & GPS points (train + student\_test) & 227,577 \\
+Points per trip (min / median / max) & 262 / 1,496 / 19,313 & Arcs per trip (min / median / max) & 649 / 18,761 / 307,392 \\
+Route arcs per trip (min / median / max) & 59 / 272 / 2,266 & Steps exactly 1 s apart (mean over trips) & 94.3 \% \\
+Trips with a time gap $>$ 60 s & 23 & Largest time gap & 153,064 s \\
+Arcs with a reverse twin (mean over trips) & 92.2 \% & Weakly connected components per trip (median / max) & 19 / 421 \\
+Largest-component share of nodes (min over trips) & 0.693 & Reference route fully connected (min over trips) & 0.9813 \\
 \bottomrule
 \end{tabularx}
 \end{rtable}
@@ -56,7 +50,7 @@ Reference route fully connected (min over trips) & 0.9813 \\
 
 *Source: `results/eda/summary.md` and `results/eda/inventory.csv` (`scripts/01_eda.py`), training and student test data.*
 
-### Missingness and validity
+## Missingness and validity
 
 ```{=latex}
 \begin{rtable}
@@ -439,6 +433,10 @@ where the best previous arc $a$ is stored as a back-pointer. Once the best overa
 - **Best:** $w_t$ = 7.99, $\beta$ = 13.75 m, break_pen = 147.8, uturn_pen = 25.9, gap_s = 299 s, gap_pen = 24.6, giving 94.35 %.
 - Student test was not used in the tuning of the decoding parameters.
 
+```{=latex}
+\newpage
+```
+
 ## Improvement in route quality?
 
 ```{=latex}
@@ -567,6 +565,10 @@ Once the classifier hyperparameters and the decoding parameters were fixed, the 
 - The transition model only considers the difference between the route length and the straight-line distance. Speed limits, turn restrictions and road type are not considered.
 - The scores used in decoding are not normalized probabilities, and the long-gap rule has no measurable effect on this data.
 - Bayesian tuning gave only a slight improvement to the classifier, and the 4 best classifiers differ by less than the fold-to-fold variation in their scores.
+
+```{=latex}
+\newpage
+```
 
 ## Conclusions
 
