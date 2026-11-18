@@ -16,7 +16,7 @@
 \usepackage{url}
 \usepackage[hidelinks]{hyperref}
 
-\definecolor{accent}{HTML}{B3263A}
+\definecolor{accent}{HTML}{1F2A37}
 \definecolor{muted}{HTML}{566170}
 \definecolor{soft}{HTML}{F2F4F7}
 
@@ -49,7 +49,7 @@
 \setlist{itemsep=1pt,topsep=2pt,parsep=0pt}
 \renewcommand{\labelitemi}{\ensuremath{\bullet}}\renewcommand{\labelitemii}{\ensuremath{\circ}} % no TS1 fonts needed
 \providecommand{\tightlist}{\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}}
-\titleformat{\section}{\Large\bfseries\color{accent}}{\thesection}{0.6em}{}[{\color{accent}\titlerule[0.8pt]}]
+\titleformat{\section}{\Large\bfseries\color{accent}}{\thesection}{0.6em}{}[{\color{muted}\titlerule[0.4pt]}]
 \titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.6em}{}
 \titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
 \titlespacing*{\section}{0pt}{14pt}{6pt}
@@ -86,14 +86,11 @@
 % ---- title page
 \begin{titlepage}
 \newgeometry{margin=24mm}
-{\color{accent}\rule{\linewidth}{1.2pt}}\par\vspace{3mm}
 {\small\color{muted}\MakeUppercase{$course$}\par}
 \vspace*{0.2\textheight}
 {\raggedright\Huge\bfseries $title$\par}
 \vspace{5mm}
 {\Large\color{muted} $subtitle$\par}
-\vspace{5mm}
-{\color{accent}\rule{0.3\linewidth}{2.5pt}}\par
 \vfill
 \renewcommand{\arraystretch}{1.5}
 \begin{tabular}{@{}>{\leavevmode\small\color{muted}}p{0.27\linewidth}>{\raggedright\arraybackslash}p{0.66\linewidth}@{}}
@@ -108,8 +105,6 @@ $if(abstract)$
 $endif$
 \par\vspace{10mm}
 {\small\color{muted} Every number, table and figure in this report was produced by the code in the repository; the file it comes from is named with each figure or table (paths are relative to the repository root).\par}
-\vspace{3mm}
-\noindent\textcolor{accent}{\rule{\linewidth}{1.2pt}}\par
 \end{titlepage}
 \restoregeometry
 

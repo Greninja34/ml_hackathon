@@ -1,0 +1,47 @@
+(ml_lab) vignesh@fedora:~/Desktop/labs/ml_lab/hackathon/final$ uvicorn api.main:app --host 0.0.0.0 --port 8000 --no-access-log
+15:47:36 | INFO | PathSnap API ready | model: XGBoost (Optuna-tuned) | radius 75 m | HMM top-8 | inference on CPU
+15:47:36 | INFO |   trip set 'student_test': 10 trips from /home/vignesh/Desktop/labs/ml_lab/hackathon/final/data/raw/student_test
+15:47:36 | INFO |   trip set 'evaluator_test': 10 trips from /home/vignesh/Desktop/labs/ml_lab/hackathon/evaluator_test
+INFO:     Started server process [58503]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+15:47:40 | INFO | 10.1.34.101:62450 GET /health -> 200 (3 ms)
+15:47:40 | INFO | 10.1.34.101:62458 GET /sets -> 200 (3 ms)
+15:47:49 | INFO | 10.1.34.101:62428 GET /trips -> 200 (7 ms)
+15:47:55 | INFO | 10.1.34.101:62460 GET /health -> 200 (3 ms)
+15:47:56 | INFO | 10.1.34.101:62466 GET /sets -> 200 (3 ms)
+15:47:58 | INFO | 10.1.34.101:62470 GET /trips -> 200 (10 ms)
+15:48:00 | INFO | [PREDICT] student_test/00000000 | 2503 GPS points | 8,542 nodes | 18,196 arcs
+15:48:00 | INFO | [RESULT]  student_test/00000000 | top-1 0.9744 (classifier only 0.9561) | continuity 0.9964 | route F1 0.9700 | route 194 arcs | pipeline 0.19s | request 0.26s
+15:48:00 | INFO | 10.1.34.101:62478 POST /predict -> 200 (343 ms)
+15:48:04 | INFO | [PREDICT] student_test/00000007 | 1354 GPS points | 2,061 nodes | 4,369 arcs
+15:48:04 | INFO | [RESULT]  student_test/00000007 | top-1 0.9993 (classifier only 0.9668) | continuity 1.0000 | route F1 0.9918 | route 121 arcs | pipeline 0.12s | request 0.15s
+15:48:04 | INFO | 10.1.34.101:62430 POST /predict -> 200 (172 ms)
+15:48:04 | INFO | [PREDICT] student_test/00000009 | 1049 GPS points | 6,745 nodes | 13,106 arcs
+15:48:04 | INFO | [RESULT]  student_test/00000009 | top-1 0.9152 (classifier only 0.8818) | continuity 0.9485 | route F1 0.9624 | route 448 arcs | pipeline 0.26s | request 0.32s
+15:48:04 | INFO | 10.1.34.101:62442 POST /predict -> 200 (368 ms)
+15:48:08 | INFO | [PREDICT] student_test/00000040 | 2995 GPS points | 12,945 nodes | 27,026 arcs
+15:48:08 | INFO | [RESULT]  student_test/00000040 | top-1 0.9890 (classifier only 0.9533) | continuity 0.9943 | route F1 0.9952 | route 319 arcs | pipeline 0.24s | request 0.39s
+15:48:08 | INFO | 10.1.34.101:62452 POST /predict -> 200 (533 ms)
+15:48:18 | INFO | [PREDICT] student_test/00000052 | 262 GPS points | 1,770 nodes | 3,577 arcs
+15:48:18 | INFO | [RESULT]  student_test/00000052 | top-1 0.9962 (classifier only 0.9733) | continuity 0.9617 | route F1 0.9894 | route 93 arcs | pipeline 0.04s | request 0.05s
+15:48:18 | INFO | 10.1.34.101:62444 POST /predict -> 200 (66 ms)
+15:48:19 | INFO | [PREDICT] student_test/00000056 | 3958 GPS points | 14,759 nodes | 27,631 arcs
+15:48:19 | INFO | [RESULT]  student_test/00000056 | top-1 0.9672 (classifier only 0.9141) | continuity 0.9671 | route F1 0.9953 | route 1332 arcs | pipeline 0.49s | request 0.91s
+15:48:20 | INFO | 10.1.34.101:62462 POST /predict -> 200 (1048 ms)
+15:48:20 | INFO | [PREDICT] student_test/00000065 | 768 GPS points | 6,448 nodes | 13,184 arcs
+15:48:20 | INFO | [RESULT]  student_test/00000065 | top-1 0.8815 (classifier only 0.8529) | continuity 0.9804 | route F1 0.9732 | route 157 arcs | pipeline 0.12s | request 0.15s
+15:48:20 | INFO | 10.1.34.101:62464 POST /predict -> 200 (190 ms)
+15:48:21 | INFO | [PREDICT] student_test/00000076 | 1486 GPS points | 26,635 nodes | 56,027 arcs
+15:48:21 | INFO | [RESULT]  student_test/00000076 | top-1 0.9758 (classifier only 0.9273) | continuity 0.9731 | route F1 0.9752 | route 396 arcs | pipeline 0.35s | request 0.42s
+15:48:21 | INFO | 10.1.34.101:62476 POST /predict -> 200 (513 ms)
+15:48:22 | INFO | [PREDICT] student_test/00000077 | 3911 GPS points | 4,424 nodes | 9,622 arcs
+15:48:22 | INFO | [RESULT]  student_test/00000077 | top-1 0.9588 (classifier only 0.7824) | continuity 0.9877 | route F1 0.9520 | route 351 arcs | pipeline 0.46s | request 0.56s
+15:48:22 | INFO | 10.1.34.101:62480 POST /predict -> 200 (611 ms)
+15:48:22 | INFO | [PREDICT] student_test/00000091 | 874 GPS points | 6,360 nodes | 12,303 arcs
+15:48:23 | INFO | [RESULT]  student_test/00000091 | top-1 0.9279 (classifier only 0.9005) | continuity 0.9702 | route F1 0.9702 | route 238 arcs | pipeline 0.14s | request 0.17s
+15:48:23 | INFO | 10.1.34.101:62484 POST /predict -> 200 (205 ms)
+16:00:35 | INFO | [PREDICT] evaluator_test/00000059 | 1031 GPS points | 12,631 nodes | 24,024 arcs
+16:00:36 | INFO | [RESULT]  evaluator_test/00000059 | top-1 0.9816 (classifier only 0.9670) | continuity 0.9272 | route F1 0.9774 | route 489 arcs | pipeline 0.32s | request 0.40s
+16:00:36 | INFO | 10.1.34.101:62402 POST /predict -> 200 (528 ms)
