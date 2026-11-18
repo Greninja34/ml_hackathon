@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.claude/
+# evaluator data / labels must never be committed
+evaluator*/
+*.env
+.env
+secrets*
+# large intermediates
+results/**/*.parquet
+results/**/cache/
