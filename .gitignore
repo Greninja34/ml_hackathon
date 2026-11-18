@@ -11,3 +11,7 @@ secrets*
 # large intermediates
 results/**/*.parquet
 results/**/cache/
+
+# personal reference material, not part of the submission
+docs/
+PLAN.md
